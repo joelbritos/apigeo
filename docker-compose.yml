@@ -1,0 +1,62 @@
+# Please refer https://aka.ms/HTTPSinContainer on how to setup an https developer certificate for your ASP .NET Core service.
+
+version: '3.4'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: Zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: Kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    
+
+  ms-sql-server:
+    container_name: sqlserver
+    image: mcr.microsoft.com/mssql/server:2017-latest-ubuntu
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Developer2021"
+      MSSQL_PID: Express
+    ports: 
+      - "1433:1433"
+
+  apigeo:
+    depends_on:
+      - ms-sql-server
+    container_name: apigeo
+    image: joelbritos/apigeo
+    build: .
+    environment:
+      DBServer: "ms-sql-server"
+      BootstrapServers: "kafka:29092"
+    ports:
+      - "8080:80"
+    
+
+  geocodificador:
+    depends_on:
+      - apigeo
+    container_name: geocodificador
+    image: joelbritos/geocodificador
+    build: .
+    environment:
+      BootstrapServers: "kafka:29092"
+    ports:
+      - "8081:81"
